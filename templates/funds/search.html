@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- 搜索框 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h4 class="card-title mb-3">
+                    <i class="bi bi-search text-primary"></i> 基金搜索
+                </h4>
+                <form action="{% url 'funds:search' %}" method="get">
+                    <div class="input-group input-group-lg">
+                        <input type="text" name="q" class="form-control"
+                               placeholder="输入基金代码或名称" value="{{ keyword }}"
+                               required>
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-search"></i> 搜索
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 搜索结果 -->
+        {% if keyword %}
+            <div class="alert alert-info" role="alert">
+                <i class="bi bi-info-circle me-2"></i>
+                搜索结果: "<strong>{{ keyword }}</strong>" (共找到 {{ results.paginator.count }} 只基金)
+            </div>
+
+            {% if results %}
+                <div class="row">
+                    {% for fund in results %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card fund-card h-100" onclick="window.open('https://finance.sina.com.cn/fund/quotes/{{ fund.fund_code }}/bc.shtml', '_blank')">
+                            <div class="card-body">
+                                <h5 class="card-title mb-2">{{ fund.fund_name }}</h5>
+                                <p class="card-text text-muted mb-1">
+                                    <i class="bi bi-tag"></i> 基金代码: <strong>{{ fund.fund_code }}</strong>
+                                </p>
+                                {% if fund.fund_type %}
+                                <p class="card-text text-muted mb-0">
+                                    <i class="bi bi-collection"></i> 类型: {{ fund.fund_type }}
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- 分页 -->
+                {% if results.has_other_pages %}
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if results.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ keyword }}&page={{ results.previous_page_number }}">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+                            </li>
+                        {% endif %}
+
+                        {% for num in results.paginator.page_range %}
+                            {% if results.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > results.number|add:'-3' and num < results.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?q={{ keyword }}&page={{ num }}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if results.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ keyword }}&page={{ results.next_page_number }}">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    未找到与 "{{ keyword }}" 相关的基金
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="alert alert-secondary" role="alert">
+                <i class="bi bi-lightbulb me-2"></i>
+                请输入基金代码或名称进行搜索
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h5 class="mb-3">热门搜索</h5>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{% url 'funds:search' %}?q=易方达" class="btn btn-outline-secondary btn-sm">易方达</a>
+                        <a href="{% url 'funds:search' %}?q=华夏" class="btn btn-outline-secondary btn-sm">华夏</a>
+                        <a href="{% url 'funds:search' %}?q=白酒" class="btn btn-outline-secondary btn-sm">白酒</a>
+                        <a href="{% url 'funds:search' %}?q=沪深300" class="btn btn-outline-secondary btn-sm">沪深300</a>
+                        <a href="{% url 'funds:search' %}?q=消费" class="btn btn-outline-secondary btn-sm">消费</a>
+                        <a href="{% url 'funds:search' %}?q=科技" class="btn btn-outline-secondary btn-sm">科技</a>
+                        <a href="{% url 'funds:search' %}?q=医药" class="btn btn-outline-secondary btn-sm">医药</a>
+                        <a href="{% url 'funds:search' %}?q=新能源" class="btn btn-outline-secondary btn-sm">新能源</a>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

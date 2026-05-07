@@ -1,0 +1,64 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+
+# 数据库（使用挂载的卷）
+*.db
+*.sqlite3
+
+# 日志
+logs/
+*.log
+
+# 媒体文件（使用挂载的卷）
+media/
+
+# 静态文件
+staticfiles/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+docker-start.sh
+
+# 文档
+*.md
+docs/
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 临时文件
+*.tmp
+.cache/
+
+# 其他
+.env.local
+.env.*.local

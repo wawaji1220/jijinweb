@@ -1,0 +1,39 @@
+
+
+services:
+  web:
+    build: .
+    container_name: jijinweb
+    ports:
+      - "8002:8000"
+    volumes:
+      # 持久化数据库
+      - ./db:/app/db
+      # 持久化日志
+      - ./logs:/app/logs
+      # 持久化媒体文件
+      - ./media:/app/media
+      # 持久化静态文件
+      - ./static:/app/static
+      # 代码热重载（开发环境）
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DJANGO_DEBUG=${DJANGO_DEBUG}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS}
+      - TZ=${TZ}
+    restart: unless-stopped
+    networks:
+      - jijinweb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  jijinweb-network:
+    driver: bridge

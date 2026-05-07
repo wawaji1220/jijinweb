@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- 返回按钮 -->
+        <div class="mb-3">
+            <a href="{% url 'funds:index' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> 返回首页
+            </a>
+        </div>
+
+        <!-- 基金基本信息 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h3 class="card-title mb-2">{{ fund.fund_name }}</h3>
+                        <p class="text-muted mb-2">
+                            <i class="bi bi-tag"></i> 基金代码: <strong>{{ fund.fund_code }}</strong>
+                            {% if fund.fund_type %}
+                            <span class="badge bg-secondary ms-2">{{ fund.fund_type }}</span>
+                            {% endif %}
+                        </p>
+                        {% if fund.fund_company %}
+                        <p class="text-muted mb-2">
+                            <i class="bi bi-building"></i> 基金公司: {{ fund.fund_company }}
+                        </p>
+                        {% endif %}
+                        {% if fund.established_date %}
+                        <p class="text-muted mb-0">
+                            <i class="bi bi-calendar"></i> 成立日期: {{ fund.established_date|date:"Y年m月d日" }}
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <div class="alert alert-info mb-0" role="alert">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small>数据最后更新</small>
+                                <span id="last-update-time" class="fw-bold">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 实时数据卡片 -->
+        <div class="row mb-4" id="realtime-section">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="card-subtitle text-muted mb-2">单位净值</h6>
+                        <h2 class="nav-value mb-0" id="unit-nav">加载中...</h2>
+                        <p class="text-muted small mt-1" id="nav-date">--</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="card-subtitle text-muted mb-2">累计净值</h6>
+                        <h2 class="nav-value mb-0" id="accumulated-nav">加载中...</h2>
+                        <p class="text-muted small mt-1" id="accumulated-date">--</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="card-subtitle text-muted mb-2">实时估算净值</h6>
+                        <h2 class="nav-value mb-0 text-primary" id="estimated-nav">加载中...</h2>
+                        <p class="text-muted small mt-1">盘中实时估算</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="card-subtitle text-muted mb-2">估算涨跌幅</h6>
+                        <h2 class="nav-value mb-0" id="estimated-growth">加载中...</h2>
+                        <p class="text-muted small mt-1">较昨日净值</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 刷新按钮 -->
+        <div class="text-center mb-4">
+            <button class="btn btn-primary btn-lg" onclick="refreshData()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新数据
+            </button>
+            <span class="badge bg-secondary ms-2 auto-refresh-badge">每30分钟自动刷新</span>
+        </div>
+
+        <!-- 净值走势图表 -->
+        <div class="chart-container">
+            <h5 class="mb-3">
+                <i class="bi bi-graph-up text-primary"></i> 基金净值走势
+            </h5>
+            <div id="nav-chart" style="height: 400px;"></div>
+        </div>
+
+        <!-- 历史数据表格 -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="bi bi-table text-primary"></i> 历史净值记录
+                </h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>净值日期</th>
+                                <th>单位净值</th>
+                                <th>累计净值</th>
+                                <th>日增长率</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if history_data %}
+                                {% for item in history_data %}
+                                <tr>
+                                    <td>{{ item.nav_date }}</td>
+                                    <td>{{ item.unit_nav }}</td>
+                                    <td>{{ item.accumulated_nav }}</td>
+                                    <td>
+                                        <span class="badge {% if item.daily_growth|float >= 0 %}bg-danger{% else %}bg-success{% endif %}">
+                                            {{ item.daily_growth }}%
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">暂无历史数据</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const fundCode = '{{ fund.fund_code }}';
+
+// 格式化时间
+function formatTime(date) {
+    return date.toLocaleString('zh-CN');
+}
+
+// 获取基金实时数据
+async function fetchRealtimeData() {
+    try {
+        const response = await fetch(`/api/realtime/?code=${fundCode}`);
+        const result = await response.json();
+
+        if (result.success && result.data) {
+            const data = result.data;
+
+            // 更新单位净值
+            if (data.unit_nav) {
+                document.getElementById('unit-nav').textContent = parseFloat(data.unit_nav).toFixed(4);
+            }
+
+            // 更新累计净值
+            if (data.accumulated_nav) {
+                document.getElementById('accumulated-nav').textContent = parseFloat(data.accumulated_nav).toFixed(4);
+            }
+
+            // 更新估算净值
+            if (data.estimated_nav) {
+                document.getElementById('estimated-nav').textContent = parseFloat(data.estimated_nav).toFixed(4);
+            }
+
+            // 更新估算增长率
+            if (data.estimated_growth !== undefined && data.estimated_growth !== null) {
+                const growth = parseFloat(data.estimated_growth);
+                const growthElement = document.getElementById('estimated-growth');
+                growthElement.textContent = (growth >= 0 ? '+' : '') + growth.toFixed(2) + '%';
+                growthElement.className = 'nav-value mb-0 ' + (growth >= 0 ? 'growth-up' : 'growth-down');
+            }
+
+            // 更新日期
+            if (data.nav_date) {
+                document.getElementById('nav-date').textContent = '更新日期: ' + data.nav_date;
+                document.getElementById('accumulated-date').textContent = '更新日期: ' + data.nav_date;
+            }
+
+            // 更新最后更新时间
+            document.getElementById('last-update-time').textContent = formatTime(new Date());
+        }
+    } catch (error) {
+        console.error('获取实时数据失败:', error);
+    }
+}
+
+// 渲染图表
+function renderChart() {
+    const chartData = {{ nav_chart|safe }};
+
+    if (chartData) {
+        const chartDiv = document.getElementById('nav-chart');
+        Plotly.newPlot(chartDiv, JSON.parse(chartData), {
+            responsive: true,
+            displayModeBar: false
+        });
+    }
+}
+
+// 刷新数据
+async function refreshData() {
+    await fetchRealtimeData();
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    fetchRealtimeData();
+    renderChart();
+
+    // 每30分钟自动刷新
+    setInterval(refreshData, 1800000); // 30分钟 = 1800000毫秒
+});
+</script>
+{% endblock %}

@@ -1,0 +1,525 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="text-center mb-4">
+            <h1 class="display-5 fw-bold mb-3">基金净值实时估算</h1>
+            <p class="lead text-muted">实时更新,精准估算,助您把握投资机会</p>
+        </div>
+
+        <!-- 搜索框 -->
+        <div class="search-box mb-4">
+            <form action="{% url 'funds:search' %}" method="get">
+                <div class="input-group input-group-lg">
+                    <input type="text" name="q" class="form-control" placeholder="输入基金代码或名称,如: 000001" required>
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-search"></i> 搜索
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 添加基金按钮 -->
+        <div class="text-end mb-3">
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addFundModal">
+                <i class="bi bi-plus-circle"></i> 添加基金
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 添加基金模态框 -->
+<div class="modal fade" id="addFundModal" tabindex="-1" aria-labelledby="addFundModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addFundModalLabel">添加基金</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addFundForm">
+                    <div class="mb-3">
+                        <label for="fundCode" class="form-label">基金代码 *</label>
+                        <input type="text" class="form-control" id="fundCode" name="code" required
+                               placeholder="例如: 000001" maxlength="6">
+                        <div class="form-text">输入基金代码后，系统将自动获取基金名称</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fundName" class="form-label">基金名称</label>
+                        <input type="text" class="form-control" id="fundName" name="name" readonly
+                               placeholder="自动获取">
+                    </div>
+                    <div class="mb-3">
+                        <label for="fundType" class="form-label">基金类型</label>
+                        <select class="form-select" id="fundType" name="type">
+                            <option value="">请选择类型</option>
+                            <option value="股票型">股票型</option>
+                            <option value="混合型">混合型</option>
+                            <option value="债券型">债券型</option>
+                            <option value="指数型">指数型</option>
+                            <option value="QDII">QDII</option>
+                            <option value="货币型">货币型</option>
+                            <option value="FOF">FOF</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="addFund()">添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 自动刷新提示 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info d-flex justify-content-between align-items-center" role="alert">
+            <div>
+                <i class="bi bi-info-circle me-2"></i>
+                数据每30分钟自动刷新,最后更新: <span id="last-update">-</span>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" onclick="refreshData()">
+                <i class="bi bi-arrow-clockwise"></i> 立即刷新
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 热门基金列表 -->
+<div class="row">
+    <div class="col-12 mb-3">
+        <h4 class="mb-3">
+            <i class="bi bi-fire text-danger"></i> 热门基金
+        </h4>
+    </div>
+
+    {% if popular_funds %}
+        {% for fund in popular_funds %}
+        <div class="col-md-4 col-lg-3 mb-3" id="fund-card-{{ fund.fund_code }}">
+            <div class="card fund-card h-100 position-relative" onclick="window.open('https://finance.sina.com.cn/fund/quotes/{{ fund.fund_code }}/bc.shtml', '_blank')">
+                <button class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2"
+                        onclick="event.stopPropagation(); deleteFund('{{ fund.fund_code }}')"
+                        title="删除基金">
+                    <i class="bi bi-trash"></i>
+                </button>
+                <div class="card-body">
+                    <h5 class="card-title mb-2">{{ fund.fund_name }}</h5>
+                    <p class="card-text text-muted mb-2">
+                        <small><i class="bi bi-tag"></i> {{ fund.fund_code }}</small>
+                    </p>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <p class="mb-1 text-muted small">最新净值</p>
+                            <p class="nav-value mb-0 nav-value-display" data-code="{{ fund.fund_code }}">
+                                加载中...
+                            </p>
+                            <p class="mb-1 text-muted small mt-2">实际涨跌</p>
+                            <p class="growth-display mb-0" data-code="{{ fund.fund_code }}">
+                                <span class="badge bg-secondary">--</span>
+                            </p>
+                            <div class="data-source-info text-muted mt-2" data-code="{{ fund.fund_code }}">
+                                <small class="text-secondary nav-date-display" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">
+                                    <i class="bi bi-calendar-check"></i> 上个交易日
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-6 text-end">
+                            <p class="mb-1 text-muted small">估算净值</p>
+                            <p class="estimated-nav-display mb-0" data-code="{{ fund.fund_code }}">
+                                --
+                            </p>
+                            <p class="mb-1 text-muted small mt-2">估算涨跌</p>
+                            <p class="estimated-growth-display mb-0" data-code="{{ fund.fund_code }}">
+                                <span class="badge bg-secondary">--</span>
+                            </p>
+                            <div class="estimated-time-info text-muted mt-2" data-code="{{ fund.fund_code }}">
+                                <small class="text-secondary"><i class="bi bi-broadcast"></i> --</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12 text-center py-5">
+            <i class="bi bi-inbox fs-1 text-muted"></i>
+            <p class="text-muted mt-3">暂无基金数据,请先添加基金</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- 推荐基金代码 -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="bi bi-star-fill text-warning"></i> 推荐基金
+                </h5>
+                <div class="row">
+                    <div class="col-md-4 mb-2">
+                        <a href="https://finance.sina.com.cn/fund/quotes/000001/bc.shtml" target="_blank" class="btn btn-outline-primary btn-sm">000001 华夏成长混合</a>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <a href="https://finance.sina.com.cn/fund/quotes/110022/bc.shtml" target="_blank" class="btn btn-outline-primary btn-sm">110022 易方达消费行业</a>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <a href="https://finance.sina.com.cn/fund/quotes/000961/bc.shtml" target="_blank" class="btn btn-outline-primary btn-sm">000961 天弘沪深300</a>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <a href="https://finance.sina.com.cn/fund/quotes/161725/bc.shtml" target="_blank" class="btn btn-outline-primary btn-sm">161725 招商中证白酒</a>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <a href="https://finance.sina.com.cn/fund/quotes/005827/bc.shtml" target="_blank" class="btn btn-outline-primary btn-sm">005827 易方达蓝筹精选</a>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <a href="https://finance.sina.com.cn/fund/quotes/001618/bc.shtml" target="_blank" class="btn btn-outline-primary btn-sm">001618 天弘中证电子</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 获取所有基金代码
+const fundCodes = [];
+{% for fund in popular_funds %}
+fundCodes.push('{{ fund.fund_code }}');
+{% endfor %}
+
+// 格式化时间 - 使用更可靠的方式
+function formatTime(date) {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+}
+
+// 更新最后更新时间
+function updateLastUpdateTime() {
+    const now = new Date();
+    document.getElementById('last-update').textContent = formatTime(now);
+}
+
+// 获取基金实时数据
+async function fetchFundRealtime(fundCode, forceRefresh = false) {
+    try {
+        const url = forceRefresh
+            ? `/api/realtime/?code=${fundCode}&force=true`
+            : `/api/realtime/?code=${fundCode}`;
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.success && result.data) {
+            const data = result.data;
+            const navElement = document.querySelector(`.nav-value-display[data-code="${fundCode}"]`);
+            const growthElement = document.querySelector(`.growth-display[data-code="${fundCode}"]`);
+            const estimatedGrowthElement = document.querySelector(`.estimated-growth-display[data-code="${fundCode}"]`);
+            const estimatedNavElement = document.querySelector(`.estimated-nav-display[data-code="${fundCode}"]`);
+            const dataSourceElement = document.querySelector(`.data-source-info[data-code="${fundCode}"]`);
+            const estimatedTimeElement = document.querySelector(`.estimated-time-info[data-code="${fundCode}"]`);
+
+            // 更新净值
+            if (navElement && data.unit_nav) {
+                navElement.textContent = parseFloat(data.unit_nav).toFixed(4);
+            }
+
+            // 更新实际涨跌（来自历史数据的官方涨跌幅）
+            if (growthElement && data.daily_growth) {
+                const dailyGrowth = parseFloat(data.daily_growth);
+                const badgeClass = dailyGrowth >= 0 ? 'bg-danger' : 'bg-success';
+                const icon = dailyGrowth >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
+                const displayValue = dailyGrowth.toFixed(2) + '%';
+                growthElement.innerHTML = `<span class="badge ${badgeClass}"><i class="bi ${icon}"></i> ${displayValue}</span>`;
+            } else if (growthElement) {
+                growthElement.innerHTML = `<span class="badge bg-secondary">--</span>`;
+            }
+
+            // 更新估算涨跌（来自新浪API的实时估算）
+            if (estimatedGrowthElement) {
+                const estimatedGrowth = data.estimated_growth;
+                if (estimatedGrowth !== undefined && estimatedGrowth !== null) {
+                    const estimatedGrowthValue = parseFloat(estimatedGrowth);
+                    const badgeClass = estimatedGrowthValue >= 0 ? 'bg-danger' : 'bg-success';
+                    const icon = estimatedGrowthValue >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
+                    const displayValue = estimatedGrowthValue.toFixed(2) + '%';
+                    estimatedGrowthElement.innerHTML = `<span class="badge ${badgeClass}"><i class="bi ${icon}"></i> ${displayValue}</span>`;
+                } else {
+                    estimatedGrowthElement.innerHTML = `<span class="badge bg-secondary">--</span>`;
+                }
+            }
+
+            // 更新估算净值
+            if (estimatedNavElement && data.estimated_nav) {
+                estimatedNavElement.textContent = parseFloat(data.estimated_nav).toFixed(4);
+            } else if (estimatedNavElement) {
+                estimatedNavElement.textContent = '--';
+            }
+
+            // 更新数据来源信息（tooltip方式显示日期）
+            if (dataSourceElement) {
+                const navDateDisplay = dataSourceElement.querySelector('.nav-date-display');
+                if (navDateDisplay && data.nav_date) {
+                    navDateDisplay.setAttribute('title', `净值日期: ${data.nav_date}`);
+                    // 更新Bootstrap tooltip
+                    const tooltip = bootstrap.Tooltip.getInstance(navDateDisplay);
+                    if (tooltip) {
+                        tooltip.setContent({ '.tooltip-inner': `净值日期: ${data.nav_date}` });
+                    }
+                } else if (navDateDisplay) {
+                    navDateDisplay.setAttribute('title', '净值日期未知');
+                }
+            }
+
+            // 更新估算时间
+            if (estimatedTimeElement) {
+                let timeText = '--';
+                if (data.estimated_nav && data.estimated_growth !== undefined && data.estimated_growth !== null) {
+                    timeText = `<small class="text-success"><i class="bi bi-broadcast"></i> 实时更新</small>`;
+                }
+                estimatedTimeElement.innerHTML = timeText;
+            }
+        }
+    } catch (error) {
+        console.error(`获取基金 ${fundCode} 数据失败:`, error);
+    }
+}
+
+// 刷新所有数据（并发获取）
+async function refreshData() {
+    updateLastUpdateTime();
+
+    if (fundCodes.length === 0) {
+        return;
+    }
+
+    // 显示加载状态
+    document.querySelectorAll('.nav-value-display, .growth-display, .estimated-nav-display, .estimated-growth-display').forEach(el => {
+        if (el.classList.contains('nav-value-display') || el.classList.contains('estimated-nav-display')) {
+            el.textContent = '加载中...';
+        }
+    });
+
+    // 使用 Promise.all 并发获取所有基金数据
+    try {
+        await Promise.all(fundCodes.map(code => fetchFundRealtime(code, true)));
+    } catch (error) {
+        console.error('批量刷新数据失败:', error);
+    }
+}
+
+// 自动获取基金信息
+let fundInfoTimeout = null;
+async function fetchFundInfo(fundCode) {
+    const fundNameInput = document.getElementById('fundName');
+    const fundTypeSelect = document.getElementById('fundType');
+
+    if (!fundCode || fundCode.length < 6) {
+        return;
+    }
+
+    try {
+        const response = await fetch('{% url "funds:api_fund_info" %}?code=' + fundCode);
+        const result = await response.json();
+
+        if (result.success && result.data) {
+            // 自动填充基金名称
+            if (result.data.fund_name) {
+                fundNameInput.value = result.data.fund_name;
+                // 添加视觉反馈
+                fundNameInput.classList.add('bg-light');
+            }
+            // 如果有基金类型，自动选择
+            if (result.data.fund_type) {
+                const options = fundTypeSelect.options;
+                for (let i = 0; i < options.length; i++) {
+                    if (options[i].value === result.data.fund_type) {
+                        fundTypeSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        } else {
+            // 清空名称，表示基金代码可能无效
+            fundNameInput.value = '';
+            fundNameInput.placeholder = '基金代码无效';
+        }
+    } catch (error) {
+        console.error('获取基金信息失败:', error);
+        fundNameInput.placeholder = '获取失败';
+    }
+}
+
+// 初始化基金代码输入监听
+function initFundCodeInput() {
+    const fundCodeInput = document.getElementById('fundCode');
+    if (fundCodeInput) {
+        // 移除旧的事件监听器（避免重复绑定）
+        fundCodeInput.removeEventListener('input', handleFundCodeInput);
+        fundCodeInput.addEventListener('input', handleFundCodeInput);
+    }
+}
+
+// 处理基金代码输入
+function handleFundCodeInput(e) {
+    const code = e.target.value.trim();
+    // 清除之前的定时器
+    if (fundInfoTimeout) {
+        clearTimeout(fundInfoTimeout);
+    }
+    // 设置新的定时器，300ms后触发查询
+    if (code.length >= 6) {
+        fundInfoTimeout = setTimeout(() => {
+            fetchFundInfo(code);
+        }, 300);
+    }
+}
+
+// 页面加载和模态框打开时初始化
+document.addEventListener('DOMContentLoaded', function() {
+    initFundCodeInput();
+
+    // 监听模态框打开事件
+    const addFundModal = document.getElementById('addFundModal');
+    if (addFundModal) {
+        addFundModal.addEventListener('shown.bs.modal', function() {
+            // 模态框打开时，重新初始化输入监听
+            initFundCodeInput();
+            // 清空之前的表单数据
+            document.getElementById('fundName').value = '';
+            document.getElementById('fundName').placeholder = '自动获取';
+            document.getElementById('fundName').classList.remove('bg-light');
+            document.getElementById('fundType').selectedIndex = 0;
+        });
+    }
+});
+
+// 添加基金
+async function addFund() {
+    const form = document.getElementById('addFundForm');
+    const formData = new FormData(form);
+
+    const code = formData.get('code').trim();
+
+    if (!code) {
+        alert('请输入基金代码');
+        return;
+    }
+
+    try {
+        const response = await fetch('{% url "funds:api_add_fund" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // 关闭模态框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addFundModal'));
+            modal.hide();
+
+            // 清空表单
+            form.reset();
+
+            // 刷新页面以显示新添加的基金
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+
+            alert('基金添加成功！');
+        } else {
+            alert(result.error || '添加失败');
+        }
+    } catch (error) {
+        console.error('添加基金失败:', error);
+        alert('添加失败，请稍后重试');
+    }
+}
+
+// 删除基金
+async function deleteFund(fundCode) {
+    if (!confirm(`确定要删除基金 ${fundCode} 吗？`)) {
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('code', fundCode);
+
+        const response = await fetch('{% url "funds:api_delete_fund" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // 移除基金卡片
+            const card = document.getElementById(`fund-card-${fundCode}`);
+            if (card) {
+                card.remove();
+            }
+
+            // 从fundCodes数组中移除
+            const index = fundCodes.indexOf(fundCode);
+            if (index > -1) {
+                fundCodes.splice(index, 1);
+            }
+
+            alert('基金删除成功！');
+        } else {
+            alert(result.error || '删除失败');
+        }
+    } catch (error) {
+        console.error('删除基金失败:', error);
+        alert('删除失败，请稍后重试');
+    }
+}
+
+// 获取CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化 Bootstrap Tooltip
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    refreshData();
+
+    // 每30分钟自动刷新
+    setInterval(refreshData, 1800000); // 30分钟 = 1800000毫秒
+});
+</script>
+{% endblock %}
