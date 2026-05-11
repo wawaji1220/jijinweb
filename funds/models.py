@@ -9,13 +9,14 @@ class Fund(models.Model):
     fund_type = models.CharField('基金类型', max_length=50, blank=True)
     fund_company = models.CharField('基金公司', max_length=100, blank=True)
     established_date = models.DateField('成立日期', null=True, blank=True)
+    display_order = models.IntegerField('显示排序', default=0, db_index=True)
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
     updated_at = models.DateTimeField('更新时间', auto_now=True)
 
     class Meta:
         verbose_name = '基金信息'
         verbose_name_plural = '基金信息'
-        ordering = ['-updated_at']
+        ordering = ['display_order', '-updated_at']
 
     def __str__(self):
         return f"{self.fund_code} - {self.fund_name}"

@@ -17,7 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # 环境变量配置
 env = environ.Env(
     DEBUG=(bool, True),
-    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
+    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1', '192.168.44.128']),
 )
 
 # 读取 .env 文件
@@ -33,7 +33,7 @@ SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-change-this-in-pr
 DEBUG = env('DJANGO_DEBUG', default=True)
 
 # 解析 ALLOWED_HOSTS 为列表
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '192.168.44.128'])
 
 
 # Application definition
@@ -118,6 +118,9 @@ TIME_ZONE = 'Asia/Shanghai'
 
 # 基金数据更新间隔（分钟）
 FUND_UPDATE_INTERVAL = 30
+
+# 首页显示基金数量
+FUND_DISPLAY_COUNT = 50
 
 USE_I18N = True
 

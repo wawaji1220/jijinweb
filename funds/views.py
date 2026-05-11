@@ -22,8 +22,9 @@ logger = logging.getLogger(__name__)
 @require_GET
 def index(request):
     """首页 - 显示热门基金列表"""
-    # 获取热门基金(最近更新的)
-    popular_funds = Fund.objects.all()[:50]
+    # 获取热门基金(按display_order排序)
+    display_count = getattr(settings, 'FUND_DISPLAY_COUNT', 50)
+    popular_funds = Fund.objects.all()[:display_count]
 
     context = {
         'popular_funds': popular_funds,
@@ -345,10 +346,12 @@ def api_delete_fund(request):
 def api_settings_get(request):
     """API: 获取设置信息"""
     interval = getattr(settings, 'FUND_UPDATE_INTERVAL', 30)
+    display_count = getattr(settings, 'FUND_DISPLAY_COUNT', 50)
     return JsonResponse({
         'success': True,
         'data': {
-            'update_interval': interval
+            'update_interval': interval,
+            'display_count': display_count,
         }
     })
 
@@ -361,64 +364,119 @@ def api_settings_update(request):
         import os
         from pathlib import Path
 
+        changes = []
+
+        # 处理刷新间隔
         interval = request.POST.get('update_interval', '').strip()
-
-        if not interval:
-            return JsonResponse({
-                'success': False,
-                'error': '请提供刷新间隔'
-            }, status=400)
-
-        try:
-            interval = int(interval)
-            if interval < 1:
+        if interval:
+            try:
+                interval = int(interval)
+                if interval < 1:
+                    return JsonResponse({
+                        'success': False,
+                        'error': '刷新间隔不能小于1分钟'
+                    }, status=400)
+                if interval > 1440:
+                    return JsonResponse({
+                        'success': False,
+                        'error': '刷新间隔不能超过1440分钟(24小时)'
+                    }, status=400)
+                # 更新运行时配置
+                settings.FUND_UPDATE_INTERVAL = interval
+                changes.append(f'刷新间隔已设置为 {interval} 分钟')
+            except ValueError:
                 return JsonResponse({
                     'success': False,
-                    'error': '刷新间隔不能小于1分钟'
+                    'error': '刷新间隔必须是数字'
                 }, status=400)
-            if interval > 1440:
+
+        # 处理显示数量
+        display_count = request.POST.get('display_count', '').strip()
+        if display_count:
+            try:
+                display_count = int(display_count)
+                if display_count < 1:
+                    return JsonResponse({
+                        'success': False,
+                        'error': '显示数量不能小于1'
+                    }, status=400)
+                if display_count > 200:
+                    return JsonResponse({
+                        'success': False,
+                        'error': '显示数量不能超过200'
+                    }, status=400)
+                # 更新运行时配置
+                settings.FUND_DISPLAY_COUNT = display_count
+                changes.append(f'显示数量已设置为 {display_count}')
+            except ValueError:
                 return JsonResponse({
                     'success': False,
-                    'error': '刷新间隔不能超过1440分钟(24小时)'
+                    'error': '显示数量必须是数字'
                 }, status=400)
-        except ValueError:
-            return JsonResponse({
-                'success': False,
-                'error': '刷新间隔必须是数字'
-            }, status=400)
 
         # 更新环境变量文件
         env_file = Path(settings.BASE_DIR) / '.env'
-        if env_file.exists():
+        if env_file.exists() and changes:
             content = env_file.read_text(encoding='utf-8')
             lines = []
-            updated = False
+            interval_updated = False
+            display_count_updated = False
 
             for line in content.splitlines():
-                if line.startswith('FUND_UPDATE_INTERVAL='):
+                if line.startswith('FUND_UPDATE_INTERVAL=') and interval:
                     lines.append(f'FUND_UPDATE_INTERVAL={interval}')
-                    updated = True
+                    interval_updated = True
+                elif line.startswith('FUND_DISPLAY_COUNT=') and display_count:
+                    lines.append(f'FUND_DISPLAY_COUNT={display_count}')
+                    display_count_updated = True
                 else:
                     lines.append(line)
 
-            if not updated:
+            if interval and not interval_updated:
                 lines.append(f'FUND_UPDATE_INTERVAL={interval}')
+            if display_count and not display_count_updated:
+                lines.append(f'FUND_DISPLAY_COUNT={display_count}')
 
             env_file.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
-        # 更新运行时配置
-        settings.FUND_UPDATE_INTERVAL = interval
-
+        message = '；'.join(changes) if changes else '未做修改'
         return JsonResponse({
             'success': True,
-            'message': f'刷新间隔已设置为 {interval} 分钟',
-            'data': {
-                'update_interval': interval
-            }
+            'message': message,
         })
     except Exception as e:
         logger.error(f"更新设置失败: {str(e)}")
         return JsonResponse({
             'success': False,
             'error': '更新失败，请稍后重试'
+        }, status=500)
+
+
+@csrf_exempt
+@require_POST
+def api_reorder_funds(request):
+    """API: 保存基金排序"""
+    try:
+        import json
+        data = json.loads(request.body)
+        order_list = data.get('order', [])
+
+        if not order_list:
+            return JsonResponse({
+                'success': False,
+                'error': '请提供排序数据'
+            }, status=400)
+
+        for index, fund_code in enumerate(order_list):
+            Fund.objects.filter(fund_code=fund_code).update(display_order=index)
+
+        return JsonResponse({
+            'success': True,
+            'message': '排序保存成功'
+        })
+    except Exception as e:
+        logger.error(f"保存排序失败: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': '保存失败，请稍后重试'
         }, status=500)

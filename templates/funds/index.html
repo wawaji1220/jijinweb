@@ -92,21 +92,28 @@
 
 <!-- 热门基金列表 -->
 <div class="row">
-    <div class="col-12 mb-3">
-        <h4 class="mb-3">
+    <div class="col-12 mb-3 d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">
             <i class="bi bi-fire text-danger"></i> 热门基金
         </h4>
+        <button class="btn btn-sm btn-outline-secondary" id="toggleDragBtn" title="拖拽排序">
+            <i class="bi bi-arrows-move"></i> 排序模式
+        </button>
     </div>
 
     {% if popular_funds %}
+        <div class="col-12" id="fund-list-container">
+        <div class="row" id="fund-list">
         {% for fund in popular_funds %}
-        <div class="col-md-4 col-lg-3 mb-3" id="fund-card-{{ fund.fund_code }}">
+        <div class="col-md-4 col-lg-3 mb-3 fund-card-wrapper" id="fund-card-{{ fund.fund_code }}" data-code="{{ fund.fund_code }}">
             <div class="card fund-card h-100 position-relative" onclick="window.open('https://finance.sina.com.cn/fund/quotes/{{ fund.fund_code }}/bc.shtml', '_blank')">
-                <button class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2"
+                <button class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2 delete-fund-btn"
+                        style="display:none;"
                         onclick="event.stopPropagation(); deleteFund('{{ fund.fund_code }}')"
                         title="删除基金">
                     <i class="bi bi-trash"></i>
                 </button>
+
                 <div class="card-body">
                     <h5 class="card-title mb-2">{{ fund.fund_name }}</h5>
                     <p class="card-text text-muted mb-2">
@@ -146,6 +153,8 @@
             </div>
         </div>
         {% endfor %}
+        </div>
+        </div>
     {% else %}
         <div class="col-12 text-center py-5">
             <i class="bi bi-inbox fs-1 text-muted"></i>
@@ -186,6 +195,47 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .fund-card-wrapper.sortable-ghost {
+        opacity: 0.3;
+    }
+    .fund-card-wrapper.sortable-chosen {
+        opacity: 0.7;
+    }
+    .fund-card-wrapper.sortable-drag {
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        border-radius: 12px;
+        transform: rotate(2deg);
+    }
+    .drag-mode .fund-card-wrapper {
+        cursor: grab;
+        transition: transform 0.1s ease, opacity 0.1s ease;
+    }
+    .drag-mode .fund-card-wrapper:active {
+        cursor: grabbing;
+    }
+    .drag-mode .fund-card-wrapper:hover {
+        transform: scale(1.03);
+        opacity: 0.9;
+    }
+    .drag-mode .fund-card {
+        pointer-events: none;
+    }
+    .drag-mode .fund-card button {
+        pointer-events: auto;
+    }
+    .drag-mode .delete-fund-btn {
+        display: block !important;
+    }
+    #toggleDragBtn.active {
+        background-color: var(--primary-color, #1890ff);
+        color: white;
+        border-color: var(--primary-color, #1890ff);
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -520,6 +570,78 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 每30分钟自动刷新
     setInterval(refreshData, 1800000); // 30分钟 = 1800000毫秒
+
+    // 初始化拖拽排序
+    initDragSort();
 });
+
+// 拖拽排序功能
+let dragMode = false;
+let sortableInstance = null;
+
+function initDragSort() {
+    const fundList = document.getElementById('fund-list');
+    const toggleBtn = document.getElementById('toggleDragBtn');
+
+    if (!fundList || !toggleBtn) return;
+
+    toggleBtn.addEventListener('click', function() {
+        dragMode = !dragMode;
+        const container = document.getElementById('fund-list-container');
+
+        if (dragMode) {
+            toggleBtn.classList.add('active');
+            container.classList.add('drag-mode');
+            // 创建 Sortable 实例
+            sortableInstance = new Sortable(fundList, {
+                animation: 50,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                dragClass: 'sortable-drag',
+                delay: 0,
+                forceFallback: true,
+                fallbackTolerance: 3,
+                swapThreshold: 0.65,
+                onEnd: function() {
+                    // 获取新的排序
+                    const items = fundList.querySelectorAll('.fund-card-wrapper');
+                    const newOrder = [];
+                    items.forEach(item => {
+                        newOrder.push(item.dataset.code);
+                    });
+                    // 保存排序到后端
+                    saveFundOrder(newOrder);
+                }
+            });
+        } else {
+            toggleBtn.classList.remove('active');
+            container.classList.remove('drag-mode');
+            // 销毁 Sortable 实例
+            if (sortableInstance) {
+                sortableInstance.destroy();
+                sortableInstance = null;
+            }
+        }
+    });
+}
+
+async function saveFundOrder(order) {
+    try {
+        const response = await fetch('{% url "funds:api_reorder_funds" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ order: order })
+        });
+        const result = await response.json();
+        if (!result.success) {
+            console.error('保存排序失败:', result.error);
+        }
+    } catch (error) {
+        console.error('保存排序失败:', error);
+    }
+}
 </script>
 {% endblock %}

@@ -132,6 +132,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
     <!-- 设置模态框 -->
     <div class="modal fade" id="settingsModal" tabindex="-1">
@@ -151,6 +152,15 @@
                         <input type="number" class="form-control" id="updateInterval" min="1" max="1440" placeholder="30">
                         <div class="form-text">
                             建议范围: 10-120 分钟。修改后需重启容器生效。
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="displayCount" class="form-label">
+                            <i class="bi bi-collection"></i> 首页显示基金数量
+                        </label>
+                        <input type="number" class="form-control" id="displayCount" min="1" max="200" placeholder="50">
+                        <div class="form-text">
+                            设置首页显示的基金数量上限，范围: 1-200。保存后需刷新页面生效。
                         </div>
                     </div>
                 </div>
@@ -173,6 +183,7 @@
         $.get('{% url "funds:api_settings_get" %}', function(response) {
             if (response.success) {
                 $('#updateInterval').val(response.data.update_interval);
+                $('#displayCount').val(response.data.display_count);
             }
         });
     });
@@ -180,23 +191,24 @@
     // 保存设置
     $('#saveSettings').click(function() {
         const interval = $('#updateInterval').val().trim();
+        const displayCount = $('#displayCount').val().trim();
 
-        if (!interval || isNaN(interval)) {
-            alert('请输入有效的刷新间隔');
-            return;
-        }
-
-        const intInterval = parseInt(interval);
-        if (intInterval < 1 || intInterval > 1440) {
+        if (interval && (isNaN(interval) || parseInt(interval) < 1 || parseInt(interval) > 1440)) {
             alert('刷新间隔必须在 1-1440 分钟之间');
             return;
         }
+        if (displayCount && (isNaN(displayCount) || parseInt(displayCount) < 1 || parseInt(displayCount) > 200)) {
+            alert('显示数量必须在 1-200 之间');
+            return;
+        }
 
-        $.post('{% url "funds:api_settings_update" %}', {
-            update_interval: interval
-        }, function(response) {
+        const postData = {};
+        if (interval) postData.update_interval = interval;
+        if (displayCount) postData.display_count = displayCount;
+
+        $.post('{% url "funds:api_settings_update" %}', postData, function(response) {
             if (response.success) {
-                alert(response.message + '\n\n注意: 修改后需要重启容器才能完全生效。');
+                alert(response.message + '\n\n注意: 修改后需要刷新页面生效。');
                 settingsModal.hide();
             } else {
                 alert('保存失败: ' + response.error);

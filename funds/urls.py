@@ -18,4 +18,5 @@ urlpatterns = [
     path('api/delete/', views.api_delete_fund, name='api_delete_fund'),
     path('api/settings/', views.api_settings_get, name='api_settings_get'),
     path('api/settings/update/', views.api_settings_update, name='api_settings_update'),
+    path('api/reorder/', views.api_reorder_funds, name='api_reorder_funds'),
 ]
