@@ -208,7 +208,6 @@
     .fund-card-wrapper.sortable-drag {
         box-shadow: 0 8px 32px rgba(0,0,0,0.25);
         border-radius: 12px;
-        transform: rotate(2deg);
     }
     .drag-mode .fund-card-wrapper {
         cursor: grab;
@@ -600,7 +599,8 @@ function initDragSort() {
                 dragClass: 'sortable-drag',
                 delay: 0,
                 forceFallback: true,
-                fallbackTolerance: 3,
+                fallbackOnBody: true,
+                fallbackTolerance: 0,
                 swapThreshold: 0.65,
                 onEnd: function() {
                     // 获取新的排序
