@@ -1,52 +1,52 @@
 #!/bin/bash
 echo "===================================="
-echo "  基金净值实时估算系统 - 快速启动"
+echo "  Fund NAV Real-time Estimation System"
 echo "===================================="
 echo
 
-echo "[1/5] 检查虚拟环境..."
+echo "[1/5] Checking virtual environment..."
 if [ ! -d "venv" ]; then
-    echo "虚拟环境不存在,正在创建..."
+    echo "Virtual environment not found, creating..."
     python3 -m venv venv
     source venv/bin/activate
-    echo "正在安装依赖..."
+    echo "Installing dependencies..."
     pip install -r requirements.txt
 else
     source venv/bin/activate
 fi
-echo "虚拟环境已激活"
+echo "Virtual environment activated"
 echo
 
-echo "[2/5] 检查数据库..."
+echo "[2/5] Checking database..."
 if [ ! -f "db.sqlite3" ]; then
-    echo "正在初始化数据库..."
+    echo "Initializing database..."
     python manage.py makemigrations
     python manage.py migrate
-    echo "超级用户: admin (请手动设置密码)"
+    echo "Superuser: admin (set password manually)"
 else
-    echo "数据库已存在"
+    echo "Database already exists"
 fi
 echo
 
-echo "[3/5] 收集静态文件..."
+echo "[3/5] Collecting static files..."
 python manage.py collectstatic --noinput
 echo
 
-echo "[4/5] 启动定时任务调度器..."
+echo "[4/5] Starting scheduler..."
 python scheduler.py &
 SCHEDULER_PID=$!
-echo "定时任务已启动 (PID: $SCHEDULER_PID)"
+echo "Scheduler started (PID: $SCHEDULER_PID)"
 echo
 
-echo "[5/5] 启动Django开发服务器..."
+echo "[5/5] Starting Django dev server..."
 echo
 echo "===================================="
-echo " 访问地址: http://127.0.0.1:8000"
-echo " 管理后台: http://127.0.0.1:8000/admin"
+echo " URL: http://127.0.0.1:8000"
+echo " Admin: http://127.0.0.1:8000/admin"
 echo "===================================="
 echo
 
 python manage.py runserver
 
-# 清理
+# Cleanup
 kill $SCHEDULER_PID 2>/dev/null

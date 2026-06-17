@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 复制项目文件
 COPY . .
 
+# 转换 shell 脚本的换行符（Windows CRLF -> Linux LF）
+RUN sed -i 's/\r$//' docker-start.sh start.sh
+
 # 创建必要的目录
 RUN mkdir -p logs db static media
 
